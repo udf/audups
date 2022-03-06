@@ -40,6 +40,10 @@ def list_music(path):
   ]
 
 
+def triangle(n):
+  return n * (n - 1) // 2
+
+
 def do_comparison(v):
   ia, ib = v
   return (ia, ib), correlate(fingerprints_a[ia], fingerprints_b[ib])
@@ -53,39 +57,38 @@ def process_results(files_a, files_b, results):
     yield DuplicateResult(a, b, similarity, offset)
 
 
-def compare_dirs(dir_a, dir_b=None):
+def compare_fingerprints(files_a, files_b=None):
+  #TODO: nonlocal
   global fingerprints_a, fingerprints_b
-  if dir_b is None:
-    dir_b = dir_a
-  # ensure lexicographic < comparisons always return true when two unique
-  # directories are scanned
-  if dir_a > dir_b:
-    dir_a, dir_b = dir_b, dir_a
 
-  if dir_a != dir_b:
-    files_a, fingerprints_a = fingerprint.get_fingerprints(list_music(dir_a))
-    files_b, fingerprints_b = fingerprint.get_fingerprints(list_music(dir_b))
-    job_count = len(files_a) * len(files_b)
-    logger.info(f'Calculated {len(files_a) + len(files_b)} fingerprints')
-  else:
-    files_a, fingerprints_a = fingerprint.get_fingerprints(list_music(dir_a))
+  if files_b is None:
+    files_a, fingerprints_a = fingerprint.get_fingerprints(files_a)
     files_b, fingerprints_b = files_a, fingerprints_a
-    job_count = len(files_a)
-    job_count = job_count * (job_count - 1) // 2
+    job_count = triangle(len(files_a))
+    job_param_gen = (
+      (ia, ib)
+      for (ia, a), (ib, b) in
+      itertools.combinations(enumerate(files_a), 2)
+    )
     logger.info(f'Calculated {len(files_a)} fingerprints')
+  else:
+    files_a, fingerprints_a = fingerprint.get_fingerprints(files_a)
+    files_b, fingerprints_b = fingerprint.get_fingerprints(files_b)
+    job_count = len(files_a) * len(files_b)
+    job_param_gen = (
+      (ia, ib)
+      for (ia, a), (ib, b) in
+      itertools.product(enumerate(files_a), enumerate(files_b))
+    )
+    logger.info(f'Calculated {len(files_a) + len(files_b)} fingerprints')
 
   logger.info(f'Doing {job_count} comparison(s)')
-  job_params = (
-    (ia, ib)
-    for (ia, a), (ib, b) in
-    itertools.product(enumerate(files_a), enumerate(files_b)) if a < b
-  )
 
   chunksize = 4096
   # TODO: progress
   progress = 0
   with ProcessPoolExecutor(max_workers=n_workers) as pool:
-    for fut in lazy_map(pool, do_comparison, job_params, chunksize=chunksize):
+    for fut in lazy_map(pool, do_comparison, job_param_gen, chunksize=chunksize):
       try:
         res = fut.result()
       except:
@@ -93,4 +96,12 @@ def compare_dirs(dir_a, dir_b=None):
         progress += chunksize
         continue
       progress += len(res)
+      print(f'{progress}/{job_count}')
       yield from process_results(files_a, files_b, res)
+
+
+def compare_dirs(dir_a, dir_b=None):
+  return compare_fingerprints(
+    list_music(dir_a),
+    list_music(dir_b) if dir_b is not None else None
+  )
