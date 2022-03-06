@@ -14,7 +14,7 @@ cache_path = Path('fpcache')
 
 @dataclass
 class FingerprintResult:
-  fingerprint: str
+  fingerprint: List[int]
   from_cache: bool = False
   error: str = None
 
