@@ -12,10 +12,6 @@ from pool_lazy_map import lazy_map
 import correlate
 
 
-fingerprints_a = []
-fingerprints_b = []
-
-
 @dataclass
 class DuplicateResult:
   a: Path
@@ -47,8 +43,15 @@ def triangle(n):
 
 def do_comparison(v):
   ia, ib = v
-  res = correlate.cross_correlate(fingerprints_a[ia], fingerprints_b[ib], 80, 1.0)
+  res = correlate.cross_correlate(
+    fingerprints_a[ia], fingerprints_b[ib], max_offset, threshold
+  )
   return (ia, ib), res
+
+
+def set_globals(values):
+  for k, v in values.items():
+    globals()[k] = v
 
 
 def process_results(files_a, files_b, results, threshold):
@@ -61,11 +64,8 @@ def process_results(files_a, files_b, results, threshold):
 
 def compare_fingerprints(
   files_a, files_b=None,
-  threshold=0.9, sample_time=90, workers=None
+  threshold=0.9, max_offset=80, sample_time=90, workers=32
 ):
-  #TODO: nonlocal
-  global fingerprints_a, fingerprints_b
-
   if files_b is None:
     files_a, fingerprints_a = get_fingerprints(
       files_a, sample_time=sample_time, workers=workers
@@ -95,10 +95,21 @@ def compare_fingerprints(
 
   logger.info(f'Doing {job_count} comparison(s)')
 
-  chunksize = 4096
+  g_vars = {
+    'fingerprints_a': fingerprints_a,
+    'fingerprints_b': fingerprints_b,
+    'max_offset': max_offset,
+    'threshold': threshold
+  }
+
+  chunksize = 32768
   # TODO: progress
   progress = 0
-  with ProcessPoolExecutor(max_workers=workers) as pool:
+  with ProcessPoolExecutor(
+    max_workers=workers,
+    initializer=set_globals,
+    initargs=(g_vars,)
+  ) as pool:
     for fut in lazy_map(pool, do_comparison, job_param_gen, chunksize=chunksize):
       try:
         res = fut.result()
@@ -113,12 +124,13 @@ def compare_fingerprints(
 
 def compare_dirs(
   dir_a, dir_b=None,
-  threshold=0.9, sample_time=90, workers=32
+  threshold=0.9, max_offset=80, sample_time=90, workers=32
 ):
   return compare_fingerprints(
     list_music(dir_a),
     list_music(dir_b) if dir_b is not None else None,
     threshold=threshold,
+    max_offset=max_offset,
     sample_time=sample_time,
     workers=workers
   )
