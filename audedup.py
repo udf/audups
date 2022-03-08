@@ -3,12 +3,13 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from dataclasses import dataclass
+import struct
 
 import common
-import fingerprint
-from common import logger, n_workers
-from correlation import correlate
+from fingerprint import get_fingerprints
+from common import logger
 from pool_lazy_map import lazy_map
+import correlate
 
 
 fingerprints_a = []
@@ -46,23 +47,29 @@ def triangle(n):
 
 def do_comparison(v):
   ia, ib = v
-  return (ia, ib), correlate(fingerprints_a[ia], fingerprints_b[ib])
+  res = correlate.cross_correlate(fingerprints_a[ia], fingerprints_b[ib], 80, 1.0)
+  return (ia, ib), res
 
 
-def process_results(files_a, files_b, results):
+def process_results(files_a, files_b, results, threshold):
   for (ia, ib), (similarity, offset) in results:
-    if similarity < common.threshold:
+    if similarity < threshold:
       continue
     a, b = files_a[ia], files_b[ib]
     yield DuplicateResult(a, b, similarity, offset)
 
 
-def compare_fingerprints(files_a, files_b=None):
+def compare_fingerprints(
+  files_a, files_b=None,
+  threshold=0.9, sample_time=90, workers=None
+):
   #TODO: nonlocal
   global fingerprints_a, fingerprints_b
 
   if files_b is None:
-    files_a, fingerprints_a = fingerprint.get_fingerprints(files_a)
+    files_a, fingerprints_a = get_fingerprints(
+      files_a, sample_time=sample_time, workers=workers
+    )
     files_b, fingerprints_b = files_a, fingerprints_a
     job_count = triangle(len(files_a))
     job_param_gen = (
@@ -72,8 +79,12 @@ def compare_fingerprints(files_a, files_b=None):
     )
     logger.info(f'Calculated {len(files_a)} fingerprints')
   else:
-    files_a, fingerprints_a = fingerprint.get_fingerprints(files_a)
-    files_b, fingerprints_b = fingerprint.get_fingerprints(files_b)
+    files_a, fingerprints_a = get_fingerprints(
+      files_a, sample_time=sample_time, workers=workers
+    )
+    files_b, fingerprints_b = get_fingerprints(
+      files_b, sample_time=sample_time, workers=workers
+    )
     job_count = len(files_a) * len(files_b)
     job_param_gen = (
       (ia, ib)
@@ -87,7 +98,7 @@ def compare_fingerprints(files_a, files_b=None):
   chunksize = 4096
   # TODO: progress
   progress = 0
-  with ProcessPoolExecutor(max_workers=n_workers) as pool:
+  with ProcessPoolExecutor(max_workers=workers) as pool:
     for fut in lazy_map(pool, do_comparison, job_param_gen, chunksize=chunksize):
       try:
         res = fut.result()
@@ -97,11 +108,17 @@ def compare_fingerprints(files_a, files_b=None):
         continue
       progress += len(res)
       print(f'{progress}/{job_count}')
-      yield from process_results(files_a, files_b, res)
+      yield from process_results(files_a, files_b, res, threshold)
 
 
-def compare_dirs(dir_a, dir_b=None):
+def compare_dirs(
+  dir_a, dir_b=None,
+  threshold=0.9, sample_time=90, workers=32
+):
   return compare_fingerprints(
     list_music(dir_a),
-    list_music(dir_b) if dir_b is not None else None
+    list_music(dir_b) if dir_b is not None else None,
+    threshold=threshold,
+    sample_time=sample_time,
+    workers=workers
   )

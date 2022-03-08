@@ -5,6 +5,7 @@ import subprocess
 import json
 from pathlib import Path
 from typing import List
+import struct
 
 import common
 from common import logger
@@ -14,21 +15,25 @@ cache_path = Path('fpcache')
 
 @dataclass
 class FingerprintResult:
-  fingerprint: List[int]
+  fingerprint: bytes
   from_cache: bool = False
   error: str = None
 
 
-def get_cached_path(filepath):
+def pack_int32(l):
+  return struct.pack('I' * len(l), *l)
+
+
+def get_cached_path(filepath, sample_time):
   return cache_path / Path(filepath).relative_to('/').with_suffix(
-    f'.fpcalc{common.sample_time}'
+    f'.fpcalc{sample_time}'
   )
 
 
-def calculate_fingerprint(filepath):
+def calculate_fingerprint(filepath, sample_time):
   try:
-    with open(get_cached_path(filepath)) as f:
-      return FingerprintResult(json.load(f), from_cache=True)
+    with open(get_cached_path(filepath, sample_time)) as f:
+      return FingerprintResult(pack_int32(json.load(f)), from_cache=True)
   except FileNotFoundError:
     pass
 
@@ -38,7 +43,7 @@ def calculate_fingerprint(filepath):
       '-plain',
       '-raw',
       '-length',
-      f'{common.sample_time}',
+      f'{sample_time}',
       filepath
     ],
     stdout=subprocess.PIPE,
@@ -49,17 +54,17 @@ def calculate_fingerprint(filepath):
     return FingerprintResult(None, error=p.stderr.decode("utf-8").strip())
 
   fingerprint = [int(i) for i in p.stdout.decode('utf-8').strip().split(',')]
-  return FingerprintResult(fingerprint)
+  return FingerprintResult(pack_int32(fingerprint))
 
 
-def get_fingerprints(paths):
+def get_fingerprints(paths, sample_time, workers):
   files = []
   fingerprints = []
   logger.info(f'Fingerprinting {len(paths)} file(s)')
 
-  with ThreadPoolExecutor(max_workers=common.n_workers) as pool:
+  with ThreadPoolExecutor(max_workers=workers) as pool:
     for filepath, res in pool.map(
-      lambda p: (p, calculate_fingerprint(p)),
+      lambda p: (p, calculate_fingerprint(p, sample_time=sample_time)),
       paths
     ):
       if res.error:
