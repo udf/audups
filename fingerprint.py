@@ -15,12 +15,12 @@ cache_path = Path('fpcache')
 
 @dataclass
 class FingerprintResult:
-  fingerprint: bytes
+  fingerprint: List[int]
   from_cache: bool = False
   error: str = None
 
 
-def pack_int32(l):
+def pack_int32_array(l):
   return struct.pack('I' * len(l), *l)
 
 
@@ -33,8 +33,8 @@ def get_cached_path(filepath, sample_time):
 def calculate_fingerprint(filepath, sample_time):
   try:
     with open(get_cached_path(filepath, sample_time)) as f:
-      return FingerprintResult(pack_int32(json.load(f)), from_cache=True)
-  except FileNotFoundError:
+      return FingerprintResult(json.load(f), from_cache=True)
+  except (FileNotFoundError, json.JSONDecodeError):
     pass
 
   p = subprocess.run(
@@ -54,7 +54,7 @@ def calculate_fingerprint(filepath, sample_time):
     return FingerprintResult(None, error=p.stderr.decode("utf-8").strip())
 
   fingerprint = [int(i) for i in p.stdout.decode('utf-8').strip().split(',')]
-  return FingerprintResult(pack_int32(fingerprint))
+  return FingerprintResult(fingerprint)
 
 
 def get_fingerprints(paths, sample_time, workers):
@@ -71,9 +71,9 @@ def get_fingerprints(paths, sample_time, workers):
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue
       files.append(filepath)
-      fingerprints.append(res.fingerprint)
+      fingerprints.append(pack_int32_array(res.fingerprint))
       if not res.from_cache:
-        cache_file = get_cached_path(filepath)
+        cache_file = get_cached_path(filepath, sample_time)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         with open(cache_file, 'w') as f:
           json.dump(res.fingerprint, f)
