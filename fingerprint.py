@@ -44,7 +44,7 @@ def calculate_fingerprint(filepath, sample_time):
   duration, encoded_fp = acoustid.fingerprint_file(filepath, maxlength=sample_time)
 
   if float(duration) < sample_time:
-    return FingerprintResult(None, error=f'First audio stream is too short ({duration}s < {sample_time}s)')
+    return FingerprintResult(None, error=f'Audio duration is too short ({duration}s < {sample_time}s)')
 
   fingerprint, _ = chromaprint.decode_fingerprint(encoded_fp)
   return FingerprintResult(fingerprint, encoded_fp=encoded_fp)
