@@ -1,72 +1,57 @@
 from dataclasses import dataclass
-import itertools
-from concurrent.futures import ThreadPoolExecutor
-import subprocess
-import json
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import List
 import struct
 
-import common
 from common import logger
 
-import ffmpeg
+import acoustid
+import chromaprint
 
-cache_path = Path('fpcache')
-
+cache_path = Path('~/.cache/audups').expanduser()
 
 @dataclass
 class FingerprintResult:
   fingerprint: List[int]
-  from_cache: bool = False
+  encoded_fp: bytes = None
   error: str = None
 
 
+def set_globals(values):
+  for k, v in values.items():
+    globals()[k] = v
+
+
 def pack_int32_array(l):
-  return struct.pack('I' * len(l), *l)
+  return struct.pack('i' * len(l), *l)
 
 
 def get_cached_path(filepath, sample_time):
   return cache_path / Path(filepath).relative_to('/').with_suffix(
-    f'.fpcalc{sample_time}'
+    f'.chromaprint'
   )
 
 
 def calculate_fingerprint(filepath, sample_time):
   try:
-    with open(get_cached_path(filepath, sample_time)) as f:
-      return FingerprintResult(json.load(f), from_cache=True)
-  except (FileNotFoundError, json.JSONDecodeError):
+    with open(get_cached_path(filepath, sample_time), 'rb') as f:
+      fingerprint, _ = chromaprint.decode_fingerprint(f.read())
+      return FingerprintResult(fingerprint)
+  except FileNotFoundError:
     pass
 
-  length = 0
-  probe = ffmpeg.probe(filepath)
-  for stream in probe['streams']:
-    if stream['codec_type'] == 'audio':
-      length = stream['duration']
-      break
+  duration, encoded_fp = acoustid.fingerprint_file(filepath, maxlength=sample_time)
 
-  if float(length) < sample_time:
-    return FingerprintResult(None, error=f'First audio stream is too short ({length}s < {sample_time}s)')
+  if float(duration) < sample_time:
+    return FingerprintResult(None, error=f'First audio stream is too short ({duration}s < {sample_time}s)')
 
-  p = subprocess.run(
-    [
-      'fpcalc',
-      '-plain',
-      '-raw',
-      '-length',
-      f'{sample_time}',
-      filepath
-    ],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE
-  )
+  fingerprint, _ = chromaprint.decode_fingerprint(encoded_fp)
+  return FingerprintResult(fingerprint, encoded_fp=encoded_fp)
 
-  if p.returncode != 0:
-    return FingerprintResult(None, error=p.stderr.decode("utf-8").strip())
 
-  fingerprint = [int(i) for i in p.stdout.decode('utf-8').strip().split(',')]
-  return FingerprintResult(fingerprint)
+def _calculate_fingerprint(p):
+  return p, calculate_fingerprint(p, sample_time)
 
 
 def get_fingerprints(paths, sample_time, workers):
@@ -74,20 +59,25 @@ def get_fingerprints(paths, sample_time, workers):
   fingerprints = []
   logger.info(f'Fingerprinting {len(paths)} file(s)')
 
-  with ThreadPoolExecutor(max_workers=workers) as pool:
-    for filepath, res in pool.map(
-      lambda p: (p, calculate_fingerprint(p, sample_time=sample_time)),
-      paths
-    ):
+  g_vars = {
+    'sample_time': sample_time
+  }
+
+  with ProcessPoolExecutor(
+    max_workers=workers,
+    initializer=set_globals,
+    initargs=(g_vars,)
+  ) as pool:
+    for filepath, res in pool.map(_calculate_fingerprint, paths):
       if res.error is not None:
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue
       files.append(filepath)
       fingerprints.append(pack_int32_array(res.fingerprint))
-      if not res.from_cache:
+      if res.encoded_fp:
         cache_file = get_cached_path(filepath, sample_time)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache_file, 'w') as f:
-          json.dump(res.fingerprint, f)
+        with open(cache_file, 'wb') as f:
+          f.write(res.encoded_fp)
 
   return files, fingerprints

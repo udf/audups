@@ -65,11 +65,12 @@ def process_results(files_a, files_b, results, threshold):
 
 def compare_fingerprints(
   files_a, files_b=None,
-  threshold=0.9, max_offset=80, sample_time=90, workers=32
+  threshold=0.9, max_offset=80, sample_time=90,
+  fp_workers=8, workers=32
 ):
   if files_b is None:
     files_a, fingerprints_a = get_fingerprints(
-      files_a, sample_time=sample_time, workers=workers
+      files_a, sample_time=sample_time, workers=fp_workers
     )
     files_b, fingerprints_b = files_a, fingerprints_a
     job_count = triangle(len(files_a))
@@ -81,10 +82,10 @@ def compare_fingerprints(
     logger.info(f'Calculated {len(files_a)} fingerprints')
   else:
     files_a, fingerprints_a = get_fingerprints(
-      files_a, sample_time=sample_time, workers=workers
+      files_a, sample_time=sample_time, workers=fp_workers
     )
     files_b, fingerprints_b = get_fingerprints(
-      files_b, sample_time=sample_time, workers=workers
+      files_b, sample_time=sample_time, workers=fp_workers
     )
     job_count = len(files_a) * len(files_b)
     job_param_gen = (
@@ -125,7 +126,8 @@ def compare_fingerprints(
 
 def compare_paths(
   paths_a, paths_b=None,
-  threshold=0.9, max_offset=80, sample_time=90, workers=32
+  threshold=0.9, max_offset=80, sample_time=90,
+  fp_workers=8, workers=32
 ):
   files_a = []
   files_b = []
@@ -141,5 +143,6 @@ def compare_paths(
     threshold=threshold,
     max_offset=max_offset,
     sample_time=sample_time,
+    fp_workers=fp_workers,
     workers=workers
   )
