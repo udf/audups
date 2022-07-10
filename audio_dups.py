@@ -3,9 +3,8 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from dataclasses import dataclass
-import struct
+import sys
 
-import common
 from fingerprint import get_fingerprints
 from common import logger
 from pool_lazy_map import lazy_map
@@ -17,11 +16,13 @@ class DuplicateResult:
   a: Path
   b: Path
   similarity: float
-  # TODO: convert to seconds?
   offset: int
 
 
 def walk_files(path):
+  if os.path.isfile(path):
+    yield Path(path)
+    return
   for root, dirs, files in os.walk(path):
     root = Path(root)
     for file in files:
@@ -118,17 +119,25 @@ def compare_fingerprints(
         progress += chunksize
         continue
       progress += len(res)
-      print(f'{progress}/{job_count}')
+      print(f'{progress}/{job_count}', file=sys.stderr)
       yield from process_results(files_a, files_b, res, threshold)
 
 
-def compare_dirs(
-  dir_a, dir_b=None,
+def compare_paths(
+  paths_a, paths_b=None,
   threshold=0.9, max_offset=80, sample_time=90, workers=32
 ):
+  files_a = []
+  files_b = []
+  for path in paths_a:
+    files_a.extend(list_music(path))
+  if paths_b is not None:
+    for path in paths_b:
+      files_b.extend(list_music(path))
+
   return compare_fingerprints(
-    list_music(dir_a),
-    list_music(dir_b) if dir_b is not None else None,
+    files_a,
+    None if paths_b is None else files_b,
     threshold=threshold,
     max_offset=max_offset,
     sample_time=sample_time,

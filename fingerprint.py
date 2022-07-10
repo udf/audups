@@ -10,6 +10,8 @@ import struct
 import common
 from common import logger
 
+import ffmpeg
+
 cache_path = Path('fpcache')
 
 
@@ -36,6 +38,16 @@ def calculate_fingerprint(filepath, sample_time):
       return FingerprintResult(json.load(f), from_cache=True)
   except (FileNotFoundError, json.JSONDecodeError):
     pass
+
+  length = 0
+  probe = ffmpeg.probe(filepath)
+  for stream in probe['streams']:
+    if stream['codec_type'] == 'audio':
+      length = stream['duration']
+      break
+
+  if float(length) < sample_time:
+    return FingerprintResult(None, error=f'First audio stream is too short ({length}s < {sample_time}s)')
 
   p = subprocess.run(
     [
@@ -67,7 +79,7 @@ def get_fingerprints(paths, sample_time, workers):
       lambda p: (p, calculate_fingerprint(p, sample_time=sample_time)),
       paths
     ):
-      if res.error:
+      if res.error is not None:
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue
       files.append(filepath)
