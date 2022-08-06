@@ -16,7 +16,6 @@ class DuplicateResult:
   a: Path
   b: Path
   similarity: float
-  offset: int
 
 
 def walk_files(path):
@@ -44,8 +43,8 @@ def triangle(n):
 
 def do_comparison(v):
   ia, ib = v
-  res = correlate.cross_correlate(
-    fingerprints_a[ia], fingerprints_b[ib], max_offset, threshold
+  res = correlate.compare_fp(
+    fingerprints_a[ia], fingerprints_b[ib], max_offset
   )
   return (ia, ib), res
 
@@ -56,11 +55,11 @@ def set_globals(values):
 
 
 def process_results(files_a, files_b, results, threshold):
-  for (ia, ib), (similarity, offset) in results:
+  for (ia, ib), similarity in results:
     if similarity < threshold:
       continue
     a, b = files_a[ia], files_b[ib]
-    yield DuplicateResult(a, b, similarity, offset)
+    yield DuplicateResult(a, b, similarity)
 
 
 def compare_fingerprints(

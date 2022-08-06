@@ -1,53 +1,141 @@
 #define PY_SPy_ssize_t_CLEAN
 #include <Python.h>
 
-#define max(a,b)             \
+#define Max(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
     _a > _b ? _a : _b;       \
 })
 
-#define min(a,b)             \
+#define Min(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
     _a < _b ? _a : _b;       \
 })
 
-float correlate(
-  uint32_t x[], uint32_t y[],
-  Py_ssize_t size_x, Py_ssize_t size_y,
-  int offset
-) {
-  Py_ssize_t xoff = 0, yoff = 0, offset_real = 0;
+#define MATCH_BITS 14
+#define MATCH_MASK ((1 << MATCH_BITS) - 1)
+#define MATCH_STRIP(x) ((uint32_t)(x) >> (32 - MATCH_BITS))
 
-  if (offset > 0) {
-    xoff = (Py_ssize_t)offset;
-    offset_real = xoff;
-  } else if (offset < 0) {
-    yoff = (Py_ssize_t)(-offset);
-    offset_real = yoff;
-  }
-  Py_ssize_t len = min(size_x - offset_real, size_y - offset_real);
+#define UNIQ_BITS 16
+#define UNIQ_MASK ((1 << MATCH_BITS) - 1)
+#define UNIQ_STRIP(x) ((uint32_t)(x) >> (32 - MATCH_BITS))
 
-  unsigned int error = 0;
-  for (Py_ssize_t i = 0; i < len; i++) {
-    error += __builtin_popcount(x[i + xoff] ^ y[i + yoff]);
+static float match_fingerprints2(uint32_t *a, Py_ssize_t asize, uint32_t *b, Py_ssize_t bsize, int maxoffset)
+{
+  int i, topcount, topoffset, size, biterror, minsize, auniq = 0, buniq = 0;
+  int numcounts = asize + bsize + 1;
+  unsigned short *counts = calloc(numcounts, sizeof(unsigned short));
+  uint8_t *seen;
+  uint16_t *aoffsets, *boffsets;
+  uint64_t *adata, *bdata;
+  float score, diversity;
+
+  aoffsets = calloc((MATCH_MASK + 1) * 2, sizeof(uint16_t));
+  boffsets = aoffsets + MATCH_MASK + 1;
+  seen = (uint8_t *)aoffsets;
+
+  for (i = 0; i < asize; i++) {
+    aoffsets[MATCH_STRIP(a[i])] = i;
   }
-  return 1.f - (float)error / 32.f / (float)len;
+  for (i = 0; i < bsize; i++) {
+    boffsets[MATCH_STRIP(b[i])] = i;
+  }
+
+  topcount = 0;
+  topoffset = 0;
+  for (i = 0; i < MATCH_MASK; i++) {
+    if (aoffsets[i] && boffsets[i]) {
+      int offset = aoffsets[i] - boffsets[i];
+      if (maxoffset == 0 || (-maxoffset <= offset && offset <= maxoffset)) {
+        offset += bsize;
+        counts[offset]++;
+        if (counts[offset] > topcount) {
+          topcount = counts[offset];
+          topoffset = offset;
+        }
+      }
+    }
+  }
+
+  topoffset -= bsize;
+
+  minsize = Min(asize, bsize) & ~1;
+  if (topoffset < 0) {
+    b -= topoffset;
+    bsize = Max(0, bsize + topoffset);
+  }
+  else {
+    a += topoffset;
+    asize = Max(0, asize - topoffset);
+  }
+
+  size = Min(asize, bsize) / 2;
+  if (!size || !minsize) {
+    score = 0.0;
+    goto exit;
+  }
+
+  memset(seen, 0, UNIQ_MASK);
+  for (i = 0; i < asize; i++) {
+    int key = UNIQ_STRIP(a[i]);
+    if (!seen[key]) {
+      auniq++;
+      seen[key] = 1;
+    }
+  }
+
+  memset(seen, 0, UNIQ_MASK);
+  for (i = 0; i < bsize; i++) {
+    int key = UNIQ_STRIP(b[i]);
+    if (!seen[key]) {
+      buniq++;
+      seen[key] = 1;
+    }
+  }
+
+  diversity = Min(
+    Min(1.0, (float)(auniq + 10) / asize + 0.5),
+    Min(1.0, (float)(buniq + 10) / bsize + 0.5)
+  );
+
+  if (topcount < Max(auniq, buniq) * 0.02) {
+    score = 0.0;
+    goto exit;
+  }
+
+  adata = (uint64_t *)a;
+  bdata = (uint64_t *)b;
+  biterror = 0;
+  for (i = 0; i < size; i++, adata++, bdata++) {
+    biterror += __builtin_popcountl(*adata ^ *bdata);
+  }
+  score = (size * 2.0 / minsize) * (1.0 - 2.0 * (float)biterror / (64 * size));
+  if (score < 0.0) {
+    score = 0.0;
+  }
+  if (diversity < 1.0) {
+    float newscore = pow(score, 8.0 - 7.0 * diversity);
+    score = newscore;
+  }
+
+exit:
+  free(aoffsets);
+  free(counts);
+  return score;
 }
 
-static PyObject* cross_correlate(PyObject *self, PyObject *args)
+static PyObject* compare_fp(PyObject *self, PyObject *args)
 {
   PyObject* bytes_x;
   PyObject* bytes_y;
   int max_offset;
-  float threshold;
 
   if (!PyArg_ParseTuple(
-    args, "SSif",
-    &bytes_x, &bytes_y, &max_offset, &threshold
+    args, "SSi",
+    &bytes_x, &bytes_y, &max_offset
   )) {
     return NULL;
   }
@@ -63,40 +151,13 @@ static PyObject* cross_correlate(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  float best_corr = 0;
-  int best_offset = 0;
-  float corr;
+  float similarity = match_fingerprints2(x, size_x, y, size_y, max_offset);
 
-  corr = correlate(x, y, size_x, size_y, 0);
-  if (corr > best_corr) {
-    if (corr >= threshold)
-      return Py_BuildValue("fi", corr, 0);
-    best_corr = corr;
-  }
-
-  for (int offset = 1; offset <= max_offset; offset++)
-  {
-    corr = correlate(x, y, size_x, size_y, offset);
-    if (corr > best_corr) {
-      if (corr >= threshold)
-        return Py_BuildValue("fi", corr, offset);
-      best_corr = corr;
-      best_offset = offset;
-    }
-
-    corr = correlate(x, y, size_x, size_y, -offset);
-    if (corr > best_corr) {
-      if (corr >= threshold)
-        return Py_BuildValue("fi", corr, -offset);
-      best_corr = corr;
-      best_offset = -offset;
-    }
-  }
-  return Py_BuildValue("fi", best_corr, best_offset);
+  return Py_BuildValue("f", similarity);
 }
 
 static PyMethodDef Methods[] = {
-  {"cross_correlate",  cross_correlate, METH_VARARGS, "Calculates bitwise cross correlation of two chromaprints"},
+  {"compare_fp", compare_fp, METH_VARARGS, "Calculates similarity of two chromaprints"},
   {NULL, NULL, 0, NULL}
 };
 
