@@ -69,7 +69,7 @@ def compare_fingerprints(
 ):
   if files_b is None:
     files_a, fingerprints_a = get_fingerprints(
-      files_a, sample_time=sample_time, workers=fp_workers
+      files_a, sample_time=sample_time, workers=fp_workers, min_fp_len=max_offset
     )
     files_b, fingerprints_b = files_a, fingerprints_a
     job_count = triangle(len(files_a))
@@ -81,10 +81,10 @@ def compare_fingerprints(
     logger.info(f'Calculated {len(files_a)} fingerprints')
   else:
     files_a, fingerprints_a = get_fingerprints(
-      files_a, sample_time=sample_time, workers=fp_workers
+      files_a, sample_time=sample_time, workers=fp_workers, min_fp_len=max_offset
     )
     files_b, fingerprints_b = get_fingerprints(
-      files_b, sample_time=sample_time, workers=fp_workers
+      files_b, sample_time=sample_time, workers=fp_workers, min_fp_len=max_offset
     )
     job_count = len(files_a) * len(files_b)
     job_param_gen = (

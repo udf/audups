@@ -72,7 +72,7 @@ def _calculate_fingerprint(p):
   return p, calculate_fingerprint(p, sample_time)
 
 
-def get_fingerprints(paths, sample_time, workers):
+def get_fingerprints(paths, sample_time, workers, min_fp_len):
   files = []
   fingerprints = []
   logger.info(f'Fingerprinting {len(paths)} file(s)')
@@ -89,6 +89,11 @@ def get_fingerprints(paths, sample_time, workers):
     for filepath, res in pool.map(_calculate_fingerprint, paths):
       if res.error is not None:
         logger.warn(f'Skipping "{filepath}": {res.error}')
+        continue
+      if len(res.fingerprint) < min_fp_len:
+        logger.warn(
+          f'Skipping "{filepath}": fingerprint too short ({len(res.fingerprint)}/{min_fp_len})'
+        )
         continue
       files.append(filepath)
       fingerprints.append(FP_PACK_FUNC(res.fingerprint))
