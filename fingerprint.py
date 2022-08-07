@@ -28,6 +28,10 @@ def pack_int32_array(l):
   return struct.pack('i' * len(l), *l)
 
 
+def pack_uint32_array(l):
+  return struct.pack('I' * len(l), *l)
+
+
 def get_cached_path(filepath, sample_time):
   return cache_path / Path(filepath).relative_to('/').with_suffix(
     f'.chromaprint'
@@ -87,7 +91,7 @@ def get_fingerprints(paths, sample_time, workers):
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue
       files.append(filepath)
-      fingerprints.append(pack_int32_array(res.fingerprint))
+      fingerprints.append(FP_PACK_FUNC(res.fingerprint))
       if res.encoded_fp:
         cache_file = get_cached_path(filepath, sample_time)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
@@ -95,3 +99,16 @@ def get_fingerprints(paths, sample_time, workers):
           f.write(res.encoded_fp)
 
   return files, fingerprints
+
+
+# pyacoustid <= 1.2.2 returns signed ints from chromaprint.decode_fingerprint
+# (there is no __version__ attribute present, so decode a sample to see if this is the case)
+def _get_fp_pack_func():
+  encoded_fp = b'AQAAO1GWJFGbRdDMJ0R-1JKMZ0a9qeBE4ZXwH7kCLVxmnMkFMvpRHc0YvjgeUQ4a9_hhwk_AlMN1HLqDJ8qFqwu0FLWOPguaN_j0Bt2UB1uePJieiBL0B9XBRNPxqROuTAz6TEdz6Cv-4zqeH9oDVzeuiGi-gT_opUdz4RkDs8rBNSRhNehH_ABBmJCGAAeQERKQo5BBwEAiDDACASAIEMgwAZASiCgiCGBCEAMRUYBCZJUC'
+  decoded, _ = chromaprint.decode_fingerprint(encoded_fp)
+  if min(decoded) < 0:
+    return pack_int32_array
+  return pack_uint32_array
+
+
+FP_PACK_FUNC = _get_fp_pack_func()
