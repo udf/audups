@@ -6,6 +6,7 @@ import struct
 
 from common import logger
 
+import audioread
 import acoustid
 import chromaprint
 
@@ -33,6 +34,19 @@ def get_cached_path(filepath, sample_time):
   )
 
 
+# force ffdec because of GStreamer bug with mp3
+# https://github.com/beetbox/audioread/issues/111
+def _fingerprint_file_audioread_ffdec(path, maxlength):
+  """Fingerprint a file by using audioread and chromaprint."""
+  try:
+    with audioread.audio_open(path, backends=(audioread.ffdec.FFmpegAudioFile,)) as f:
+      duration = f.duration
+      fp = acoustid.fingerprint(f.samplerate, f.channels, iter(f), maxlength)
+  except audioread.DecodeError:
+    raise acoustid.FingerprintGenerationError("audio could not be decoded")
+  return duration, fp
+
+
 def calculate_fingerprint(filepath, sample_time):
   try:
     with open(get_cached_path(filepath, sample_time), 'rb') as f:
@@ -41,7 +55,7 @@ def calculate_fingerprint(filepath, sample_time):
   except FileNotFoundError:
     pass
 
-  duration, encoded_fp = acoustid.fingerprint_file(filepath, maxlength=sample_time)
+  duration, encoded_fp = _fingerprint_file_audioread_ffdec(filepath, maxlength=sample_time)
 
   if float(duration) < sample_time:
     return FingerprintResult(None, error=f'Audio duration is too short ({duration}s < {sample_time}s)')
