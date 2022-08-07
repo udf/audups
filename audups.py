@@ -5,6 +5,7 @@ import sys
 
 from audio_dups import compare_paths
 
+# TODO: --no-cache, --clear-cache, --print0
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
     description=(
@@ -36,7 +37,10 @@ if __name__ == '__main__':
     '--max-offset',
     default=80,
     type=int,
-    help='The maximum fingerprint offset allowed, higher values allow for a match to be found when the audio is shifted more.'
+    help=(
+      'The maximum fingerprint offset allowed, higher values allow for a match to be found when the audio is shifted more.\n'
+      'The offset is specified in fingerprint frames, which are approximately 1/8th of a second each.'
+    )
   )
   parser.add_argument(
     '--sample-time',
