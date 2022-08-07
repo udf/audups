@@ -29,8 +29,8 @@ if __name__ == '__main__':
   )
   parser.add_argument(
     '--threshold',
-    default=90,
-    type=int,
+    default=0.9,
+    type=float,
     help='Print audio files if they are at least THRESHOLD percent similar'
   )
   parser.add_argument(
@@ -91,7 +91,7 @@ if __name__ == '__main__':
   iterator = compare_paths(
     paths_a=paths_a,
     paths_b=paths_b,
-    threshold=args.threshold / 100,
+    threshold=args.threshold,
     max_offset=args.max_offset,
     sample_time=args.sample_time,
   )
