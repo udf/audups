@@ -44,6 +44,9 @@ def _fingerprint_file_audioread_ffdec(path, maxlength):
   """Fingerprint a file by using audioread and chromaprint."""
   try:
     with audioread.audio_open(path, backends=(audioread.ffdec.FFmpegAudioFile,)) as f:
+      if f.channels > 2:
+        # TODO: make own reader that merges channels in ffmpeg
+        raise RuntimeError('fixme: too many channels')
       duration = f.duration
       fp = acoustid.fingerprint(f.samplerate, f.channels, iter(f), maxlength)
   except audioread.DecodeError:
@@ -59,10 +62,10 @@ def calculate_fingerprint(filepath, sample_time):
   except FileNotFoundError:
     pass
 
-  duration, encoded_fp = _fingerprint_file_audioread_ffdec(filepath, maxlength=sample_time)
-
-  if float(duration) < sample_time:
-    return FingerprintResult(None, error=f'Audio duration is too short ({duration}s < {sample_time}s)')
+  try:
+    duration, encoded_fp = _fingerprint_file_audioread_ffdec(filepath, maxlength=sample_time)
+  except Exception as e:
+    return FingerprintResult(None, error=str(e))
 
   fingerprint, _ = chromaprint.decode_fingerprint(encoded_fp)
   return FingerprintResult(fingerprint, encoded_fp=encoded_fp)
