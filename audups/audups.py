@@ -3,7 +3,7 @@ import dataclasses
 import json
 import sys
 
-from audio_dups import compare_paths
+from .compare import compare_paths
 
 # TODO: --no-cache, --clear-cache, --print0
 if __name__ == '__main__':

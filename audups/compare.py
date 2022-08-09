@@ -5,10 +5,10 @@ from pathlib import Path
 from dataclasses import dataclass
 import sys
 
-from fingerprint import get_fingerprints
-from common import logger
-from pool_lazy_map import lazy_map
-import correlate
+from .fingerprint import get_fingerprints
+from .common import logger
+from .pool_lazy_map import lazy_map
+from . import correlate
 
 
 @dataclass

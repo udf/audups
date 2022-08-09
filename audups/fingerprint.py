@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 import struct
 
-from common import logger
+from .common import logger
 
 import audioread
 import acoustid
