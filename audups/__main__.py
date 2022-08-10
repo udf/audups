@@ -5,8 +5,9 @@ import sys
 
 from .compare import compare_paths
 
+
 # TODO: --no-cache, --clear-cache, --print0
-if __name__ == '__main__':
+def main():
   parser = argparse.ArgumentParser(
     description=(
       'Finds duplicate audio files from two sets of paths by comparing acoustid fingerprints.\n'
@@ -100,3 +101,7 @@ if __name__ == '__main__':
     res.a = str(res.a)
     res.b = str(res.b)
     print(json.dumps(dataclasses.asdict(res)))
+
+
+if __name__ == '__main__':
+  main()

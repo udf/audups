@@ -7,7 +7,9 @@ if __name__ == '__main__':
     name='audups',
     version=VERSION,
     python_requires='>=3.9',
-    scripts=['audups.py'],
+    entry_points={
+      'console_scripts': ['audups = audups:main']
+    },
     ext_modules=[
       Extension(
         'audups.correlate',
