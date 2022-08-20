@@ -27,7 +27,7 @@ def _std_out_err_redirect_tqdm():
         sys.stdout, sys.stderr = orig_out_err
 
 
-# TODO: --no-cache, --clear-cache, --print0
+# TODO: --no-cache, --clear-cache
 def main():
   logging.basicConfig(level=logging.INFO)
 
@@ -104,6 +104,24 @@ def main():
     metavar='PATH_B'
   )
 
+  group = parser.add_argument_group('output options', 'Passing any of these will disable JSON output')
+  print_group = group.add_mutually_exclusive_group()
+  print_group.add_argument(
+    '--printa',
+    help='Only print files from the first set of directories (those passed with --a)',
+    action='store_true'
+  )
+  print_group.add_argument(
+    '--printb',
+    help='Only print files from the second set of directories (those passed with --b)',
+    action='store_true'
+  )
+  group.add_argument(
+    '--print0',
+    help="Use null characters ('\0') to separate each line of output (instead of newlines)",
+    action='store_true'
+  )
+
   args = parser.parse_args()
 
   paths_a = args.list_a
@@ -112,6 +130,9 @@ def main():
   paths_b = args.list_b
   if args.B:
     paths_b.append(args.B)
+
+  json_output = not (args.printa or args.printb or args.print0)
+  line_end = '\0' if args.print0 else '\n'
 
   with _std_out_err_redirect_tqdm() as orig_stdout:
     iterator = compare_paths(
@@ -126,4 +147,7 @@ def main():
     for res in iterator:
       res.a = str(res.a)
       res.b = str(res.b)
-      print(json.dumps(dataclasses.asdict(res)))
+      if json_output:
+        print(json.dumps(dataclasses.asdict(res)))
+        continue
+      print(res.a if args.printa else res.b, end=line_end)
