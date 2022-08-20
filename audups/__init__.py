@@ -10,7 +10,7 @@ from tqdm.contrib import DummyTqdmFile
 
 from .compare import compare_paths, compare_filelists
 
-__version__ = '0.1'
+__version__ = '0.1-2'
 
 
 @contextlib.contextmanager

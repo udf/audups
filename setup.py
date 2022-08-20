@@ -8,7 +8,7 @@ if __name__ == '__main__':
   setup(
     name='audups',
     description='Command line tool for finding similar audio files using their AcoustID fingerprints',
-    long_description='long_description',
+    long_description=long_description,
     long_description_content_type='text/markdown',
 
     url='https://github.com/udf/audups',
