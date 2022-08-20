@@ -1,4 +1,4 @@
-# tup
+# audups
 Command line tool for finding similar audio files using their [AcoustID fingerprints](https://acoustid.org/)
 
 ## Requirements
