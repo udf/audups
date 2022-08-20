@@ -55,6 +55,8 @@ def _fingerprint_file_audioread_ffdec(path, maxlength):
 
 
 def calculate_fingerprint(filepath, sample_time):
+  if not Path(filepath).exists:
+    return FingerprintResult(None, error='file not found')
   try:
     with open(get_cached_path(filepath, sample_time), 'rb') as f:
       fingerprint, _ = chromaprint.decode_fingerprint(f.read())
