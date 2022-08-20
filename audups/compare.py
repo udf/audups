@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import sys
 
 from .fingerprint import get_fingerprints
-from .common import logger
+from .common import logger, dynamic_tqdm
 from .pool_lazy_map import lazy_map
 from . import correlate
 
@@ -65,7 +65,7 @@ def _process_results(files_a, files_b, results, threshold):
 def compare_filelists(
   files_a, files_b=None,
   threshold=0.9, max_offset=80, sample_time=90,
-  fp_workers=8, workers=32
+  fp_workers=8, workers=32, stdout=None
 ):
   if files_b is None:
     files_a, fingerprints_a = get_fingerprints(
@@ -103,44 +103,45 @@ def compare_filelists(
   }
 
   chunksize = 32768
-  # TODO: progress
-  progress = 0
-  with ProcessPoolExecutor(
-    max_workers=workers,
-    initializer=_set_globals,
-    initargs=(g_vars,)
-  ) as pool:
+  with (
+    ProcessPoolExecutor(
+      max_workers=workers,
+      initializer=_set_globals,
+      initargs=(g_vars,)
+    ) as pool,
+    dynamic_tqdm(total=job_count, file=stdout, unit=' comps') as progress
+  ):
     for fut in lazy_map(pool, _do_comparison, job_param_gen, chunksize=chunksize):
       try:
         res = fut.result()
       except:
         logger.exception('task exception')
-        progress += chunksize
+        progress.update(chunksize)
         continue
-      progress += len(res)
-      print(f'{progress}/{job_count}', file=sys.stderr)
+      progress.update(len(res))
       yield from _process_results(files_a, files_b, res, threshold)
 
 
 def compare_paths(
   paths_a, paths_b=None,
   threshold=0.9, max_offset=80, sample_time=90,
-  fp_workers=8, workers=32
+  fp_workers=8, workers=32, stdout=None
 ):
   files_a = []
   files_b = []
   for path in paths_a:
     files_a.extend(list_music(path))
-  if paths_b is not None:
+  if paths_b:
     for path in paths_b:
       files_b.extend(list_music(path))
 
   return compare_filelists(
     files_a,
-    None if paths_b is None else files_b,
+    files_b or None,
     threshold=threshold,
     max_offset=max_offset,
     sample_time=sample_time,
     fp_workers=fp_workers,
-    workers=workers
+    workers=workers,
+    stdout=stdout
   )

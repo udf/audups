@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 import struct
 
-from .common import logger
+from .common import logger, dynamic_tqdm
 
 import audioread
 import acoustid
@@ -90,12 +90,17 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
     'sample_time': sample_time
   }
 
-  with ProcessPoolExecutor(
-    max_workers=workers,
-    initializer=_set_globals,
-    initargs=(g_vars,)
-  ) as pool:
-    for filepath, res in pool.map(_calculate_fingerprint, paths):
+  with (
+    ProcessPoolExecutor(
+      max_workers=workers,
+      initializer=_set_globals,
+      initargs=(g_vars,)
+    ) as pool,
+    dynamic_tqdm(total=len(paths), unit=' files') as progress
+  ):
+    for filepath, res in pool.map(_calculate_fingerprint, paths, chunksize=1):
+      if progress:
+        progress.update(1)
       if res.error is not None:
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue

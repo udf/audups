@@ -1,17 +1,36 @@
 import argparse
+import contextlib
 import dataclasses
 import json
-import sys
+import logging
 import os
+import sys
+
+from tqdm.contrib import DummyTqdmFile
 
 from .compare import compare_paths
-
 
 __version__ = '0.1'
 
 
+@contextlib.contextmanager
+def _std_out_err_redirect_tqdm():
+    orig_out_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
+        yield orig_out_err[0]
+    # Relay exceptions
+    except Exception as exc:
+        raise exc
+    # Always restore sys.stdout/err if necessary
+    finally:
+        sys.stdout, sys.stderr = orig_out_err
+
+
 # TODO: --no-cache, --clear-cache, --print0
 def main():
+  logging.basicConfig(level=logging.INFO)
+
   prog = os.path.basename(sys.argv[0])
   parser = argparse.ArgumentParser(
     description=(
@@ -94,15 +113,17 @@ def main():
   if args.B:
     paths_b.append(args.B)
 
-  iterator = compare_paths(
-    paths_a=paths_a,
-    paths_b=paths_b,
-    threshold=args.threshold,
-    max_offset=args.max_offset,
-    sample_time=args.sample_time,
-  )
+  with _std_out_err_redirect_tqdm() as orig_stdout:
+    iterator = compare_paths(
+      paths_a=paths_a,
+      paths_b=paths_b,
+      threshold=args.threshold,
+      max_offset=args.max_offset,
+      sample_time=args.sample_time,
+      stdout=orig_stdout
+    )
 
-  for res in iterator:
-    res.a = str(res.a)
-    res.b = str(res.b)
-    print(json.dumps(dataclasses.asdict(res)))
+    for res in iterator:
+      res.a = str(res.a)
+      res.b = str(res.b)
+      print(json.dumps(dataclasses.asdict(res)))
