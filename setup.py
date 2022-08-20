@@ -1,5 +1,5 @@
-from setuptools import setup, find_packages, Extension
-from audups import __version__
+from setuptools import Extension, find_packages, setup
+
 
 if __name__ == '__main__':
   with open('README.md', 'r') as f:
@@ -7,7 +7,6 @@ if __name__ == '__main__':
 
   setup(
     name='audups',
-    version=__version__,
     description='Command line tool for finding similar audio files using their AcoustID fingerprints',
 
     url='https://github.com/udf/audups',

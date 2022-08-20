@@ -8,7 +8,7 @@ import sys
 
 from tqdm.contrib import DummyTqdmFile
 
-from .compare import compare_paths
+from .compare import compare_paths, compare_filelists
 
 __version__ = '0.1'
 

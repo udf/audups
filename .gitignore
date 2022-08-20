@@ -4,3 +4,4 @@ build
 *.so
 fpcache
 *.egg-info
+*.tar.gz
