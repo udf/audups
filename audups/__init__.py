@@ -7,6 +7,9 @@ import os
 from .compare import compare_paths
 
 
+__version__ = '0.1'
+
+
 # TODO: --no-cache, --clear-cache, --print0
 def main():
   prog = os.path.basename(sys.argv[0])
