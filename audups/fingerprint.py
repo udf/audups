@@ -19,20 +19,20 @@ class FingerprintResult:
   error: str = None
 
 
-def set_globals(values):
+def _set_globals(values):
   for k, v in values.items():
     globals()[k] = v
 
 
-def pack_int32_array(l):
+def _pack_int32_array(l):
   return struct.pack('i' * len(l), *l)
 
 
-def pack_uint32_array(l):
+def _pack_uint32_array(l):
   return struct.pack('I' * len(l), *l)
 
 
-def get_cached_path(filepath, sample_time):
+def _get_cached_path(filepath, sample_time):
   return cache_path / Path(filepath).relative_to('/').with_suffix(
     f'.chromaprint'
   )
@@ -55,7 +55,7 @@ def _fingerprint_file_audioread_ffdec(path, maxlength):
 
 
 def calculate_fingerprint(filepath, sample_time):
-  fp_path = get_cached_path(filepath, sample_time)
+  fp_path = _get_cached_path(filepath, sample_time)
   if not Path(filepath).exists:
     if fp_path.exists():
       logger.info(f'Removing old fingerprint {fp_path}')
@@ -92,7 +92,7 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
 
   with ProcessPoolExecutor(
     max_workers=workers,
-    initializer=set_globals,
+    initializer=_set_globals,
     initargs=(g_vars,)
   ) as pool:
     for filepath, res in pool.map(_calculate_fingerprint, paths):
@@ -105,9 +105,9 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
         )
         continue
       files.append(filepath)
-      fingerprints.append(FP_PACK_FUNC(res.fingerprint))
+      fingerprints.append(_FP_PACK_FUNC(res.fingerprint))
       if res.encoded_fp:
-        cache_file = get_cached_path(filepath, sample_time)
+        cache_file = _get_cached_path(filepath, sample_time)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         with open(cache_file, 'wb') as f:
           f.write(res.encoded_fp)
@@ -121,8 +121,8 @@ def _get_fp_pack_func():
   encoded_fp = b'AQAAO1GWJFGbRdDMJ0R-1JKMZ0a9qeBE4ZXwH7kCLVxmnMkFMvpRHc0YvjgeUQ4a9_hhwk_AlMN1HLqDJ8qFqwu0FLWOPguaN_j0Bt2UB1uePJieiBL0B9XBRNPxqROuTAz6TEdz6Cv-4zqeH9oDVzeuiGi-gT_opUdz4RkDs8rBNSRhNehH_ABBmJCGAAeQERKQo5BBwEAiDDACASAIEMgwAZASiCgiCGBCEAMRUYBCZJUC'
   decoded, _ = chromaprint.decode_fingerprint(encoded_fp)
   if min(decoded) < 0:
-    return pack_int32_array
-  return pack_uint32_array
+    return _pack_int32_array
+  return _pack_uint32_array
 
 
-FP_PACK_FUNC = _get_fp_pack_func()
+_FP_PACK_FUNC = _get_fp_pack_func()

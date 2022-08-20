@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-from .compare import compare_fingerprints, compare_paths
+from .compare import compare_paths
 
 
 # TODO: --no-cache, --clear-cache, --print0

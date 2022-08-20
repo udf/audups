@@ -18,7 +18,7 @@ class DuplicateResult:
   similarity: float
 
 
-def walk_files(path):
+def _walk_files(path):
   if os.path.isfile(path):
     yield Path(path)
     return
@@ -32,16 +32,16 @@ def walk_files(path):
 def list_music(path):
   logger.info(f'Collecting files from {path}')
   return [
-    p for p in walk_files(path)
+    p for p in _walk_files(path)
     if p.suffix.lower() in {'.opus', '.flac', '.mp3', '.m4a', '.ogg'}
   ]
 
 
-def triangle(n):
+def _triangle(n):
   return n * (n - 1) // 2
 
 
-def do_comparison(v):
+def _do_comparison(v):
   ia, ib = v
   res = correlate.compare_fp(
     fingerprints_a[ia], fingerprints_b[ib], max_offset
@@ -49,12 +49,12 @@ def do_comparison(v):
   return (ia, ib), res
 
 
-def set_globals(values):
+def _set_globals(values):
   for k, v in values.items():
     globals()[k] = v
 
 
-def process_results(files_a, files_b, results, threshold):
+def _process_results(files_a, files_b, results, threshold):
   for (ia, ib), similarity in results:
     if similarity < threshold:
       continue
@@ -62,7 +62,7 @@ def process_results(files_a, files_b, results, threshold):
     yield DuplicateResult(a, b, similarity)
 
 
-def compare_fingerprints(
+def compare_filelists(
   files_a, files_b=None,
   threshold=0.9, max_offset=80, sample_time=90,
   fp_workers=8, workers=32
@@ -72,7 +72,7 @@ def compare_fingerprints(
       files_a, sample_time=sample_time, workers=fp_workers, min_fp_len=max_offset
     )
     files_b, fingerprints_b = files_a, fingerprints_a
-    job_count = triangle(len(files_a))
+    job_count = _triangle(len(files_a))
     job_param_gen = (
       (ia, ib)
       for (ia, a), (ib, b) in
@@ -99,8 +99,7 @@ def compare_fingerprints(
   g_vars = {
     'fingerprints_a': fingerprints_a,
     'fingerprints_b': fingerprints_b,
-    'max_offset': max_offset,
-    'threshold': threshold
+    'max_offset': max_offset
   }
 
   chunksize = 32768
@@ -108,10 +107,10 @@ def compare_fingerprints(
   progress = 0
   with ProcessPoolExecutor(
     max_workers=workers,
-    initializer=set_globals,
+    initializer=_set_globals,
     initargs=(g_vars,)
   ) as pool:
-    for fut in lazy_map(pool, do_comparison, job_param_gen, chunksize=chunksize):
+    for fut in lazy_map(pool, _do_comparison, job_param_gen, chunksize=chunksize):
       try:
         res = fut.result()
       except:
@@ -120,7 +119,7 @@ def compare_fingerprints(
         continue
       progress += len(res)
       print(f'{progress}/{job_count}', file=sys.stderr)
-      yield from process_results(files_a, files_b, res, threshold)
+      yield from _process_results(files_a, files_b, res, threshold)
 
 
 def compare_paths(
@@ -136,7 +135,7 @@ def compare_paths(
     for path in paths_b:
       files_b.extend(list_music(path))
 
-  return compare_fingerprints(
+  return compare_filelists(
     files_a,
     None if paths_b is None else files_b,
     threshold=threshold,
