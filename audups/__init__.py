@@ -2,12 +2,14 @@ import argparse
 import dataclasses
 import json
 import sys
+import os
 
 from .compare import compare_fingerprints, compare_paths
 
 
 # TODO: --no-cache, --clear-cache, --print0
 def main():
+  prog = os.path.basename(sys.argv[0])
   parser = argparse.ArgumentParser(
     description=(
       'Finds duplicate audio files from two sets of paths by comparing acoustid fingerprints.\n'
@@ -16,13 +18,13 @@ def main():
     ),
     epilog=(
       'examples:\n'
-      f'  {sys.argv[0]} MUSIC\n'
+      f'  {prog} MUSIC\n'
       '    Find duplicates by comparing the files in MUSIC to themselves\n'
       '\n'
-      f'  {sys.argv[0]} MUSIC1 MUSIC2\n'
+      f'  {prog} MUSIC1 MUSIC2\n'
       '    Find duplicates by comparing the files in MUSIC1 to the files in MUSIC2\n'
       '\n'
-      f'  {sys.argv[0]} --a MUSIC1 MUSIC2 --b MUSIC3\n'
+      f'  {prog} --a MUSIC1 MUSIC2 --b MUSIC3\n'
       '    Find duplicates by comparing the files in MUSIC1 and MUSIC2 to the files in MUSIC3\n'
       '    (Note that files specified in --a are not compared with other files specified in --a)\n'
     ),
