@@ -65,7 +65,7 @@ def _process_results(files_a, files_b, results, threshold):
 def compare_filelists(
   files_a, files_b=None,
   threshold=0.9, max_offset=80, sample_time=90,
-  fp_workers=8, workers=32, stdout=None
+  fp_workers=8, workers=32
 ):
   if files_b is None:
     files_a, fingerprints_a = get_fingerprints(
@@ -109,7 +109,7 @@ def compare_filelists(
       initializer=_set_globals,
       initargs=(g_vars,)
     ) as pool,
-    dynamic_tqdm(total=job_count, file=stdout, unit=' comps') as progress
+    dynamic_tqdm(total=job_count, unit=' comps') as progress
   ):
     for fut in lazy_map(pool, _do_comparison, job_param_gen, chunksize=chunksize):
       try:
@@ -125,7 +125,7 @@ def compare_filelists(
 def compare_paths(
   paths_a, paths_b=None,
   threshold=0.9, max_offset=80, sample_time=90,
-  fp_workers=8, workers=32, stdout=None
+  fp_workers=8, workers=32
 ):
   files_a = []
   files_b = []
@@ -142,6 +142,5 @@ def compare_paths(
     max_offset=max_offset,
     sample_time=sample_time,
     fp_workers=fp_workers,
-    workers=workers,
-    stdout=stdout
+    workers=workers
   )

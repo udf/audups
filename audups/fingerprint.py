@@ -33,7 +33,7 @@ def _pack_uint32_array(l):
 
 
 def _get_cached_path(filepath, sample_time):
-  return cache_path / Path(filepath).relative_to('/').with_suffix(
+  return cache_path / Path(filepath).resolve().relative_to('/').with_suffix(
     f'.chromaprint'
   )
 
@@ -98,7 +98,7 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
     ) as pool,
     dynamic_tqdm(total=len(paths), unit=' files') as progress
   ):
-    for filepath, res in pool.map(_calculate_fingerprint, paths, chunksize=1):
+    for filepath, res in pool.map(_calculate_fingerprint, paths, chunksize=8):
       if progress:
         progress.update(1)
       if res.error is not None:
