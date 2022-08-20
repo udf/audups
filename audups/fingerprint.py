@@ -55,10 +55,14 @@ def _fingerprint_file_audioread_ffdec(path, maxlength):
 
 
 def calculate_fingerprint(filepath, sample_time):
+  fp_path = get_cached_path(filepath, sample_time)
   if not Path(filepath).exists:
+    if fp_path.exists():
+      logger.info(f'Removing old fingerprint {fp_path}')
+      fp_path.unlink()
     return FingerprintResult(None, error='file not found')
   try:
-    with open(get_cached_path(filepath, sample_time), 'rb') as f:
+    with open(fp_path, 'rb') as f:
       fingerprint, _ = chromaprint.decode_fingerprint(f.read())
       return FingerprintResult(fingerprint)
   except FileNotFoundError:
