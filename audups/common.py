@@ -2,7 +2,6 @@ import logging
 import sys
 import contextlib
 
-import tqdm
 from tqdm.contrib.logging import tqdm_logging_redirect
 
 
@@ -16,7 +15,6 @@ def dynamic_tqdm(*tqdm_args, **tqdm_kwargs):
     if sys.stderr.isatty() and logger.isEnabledFor(logging.INFO):
       progress = cm.enter_context(tqdm_logging_redirect(
         *tqdm_args,
-        loggers=[logger],
         **tqdm_kwargs
       ))
     else:

@@ -109,7 +109,7 @@ def compare_filelists(
       initializer=_set_globals,
       initargs=(g_vars,)
     ) as pool,
-    dynamic_tqdm(total=job_count, unit=' comps') as progress
+    dynamic_tqdm(total=job_count, unit=' comps', dynamic_ncols=True) as progress
   ):
     for fut in lazy_map(pool, _do_comparison, job_param_gen, chunksize=chunksize):
       try:

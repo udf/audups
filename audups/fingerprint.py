@@ -96,7 +96,7 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
       initializer=_set_globals,
       initargs=(g_vars,)
     ) as pool,
-    dynamic_tqdm(total=len(paths), unit=' files') as progress
+    dynamic_tqdm(total=len(paths), unit=' files', dynamic_ncols=True) as progress
   ):
     for filepath, res in pool.map(_calculate_fingerprint, paths, chunksize=8):
       if progress:
