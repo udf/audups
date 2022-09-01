@@ -8,7 +8,7 @@ import sys
 
 from .compare import compare_paths, compare_filelists
 
-__version__ = '0.1-4'
+__version__ = '0.1-5'
 
 
 # TODO: --no-cache, --clear-cache
@@ -130,6 +130,6 @@ def main():
     res.a = str(res.a)
     res.b = str(res.b)
     if json_output:
-      print(json.dumps(dataclasses.asdict(res)))
+      print(json.dumps(dataclasses.asdict(res), ensure_ascii=False))
       continue
     print(res.b if args.printb else res.a, end=line_end)
