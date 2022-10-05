@@ -104,7 +104,7 @@ def get_fingerprints(paths, sample_time, workers, min_fp_len):
       if res.error is not None:
         logger.warn(f'Skipping "{filepath}": {res.error}')
         continue
-      if len(res.fingerprint) < min_fp_len:
+      if len(res.fingerprint) <= min_fp_len:
         logger.warn(
           f'Skipping "{filepath}": fingerprint too short ({len(res.fingerprint)}/{min_fp_len})'
         )
