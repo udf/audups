@@ -8,7 +8,7 @@ import sys
 
 from .compare import compare_paths, compare_filelists
 
-__version__ = '0.1-5'
+__version__ = '0.1-6'
 
 
 # TODO: --no-cache, --clear-cache
